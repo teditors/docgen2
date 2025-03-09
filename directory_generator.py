@@ -21,6 +21,10 @@ from config import (
     TEST_TYPES
 )
 from pdf_generator import PDFGenerator
+from test_log_generator import TestLogGenerator
+from hardware_generator_main import HardwareImageGenerator
+from logger import setup_logger
+from utility_functions import sanitize_filename, ensure_directory, safe_file_operation
 
 class DirectoryGenerator:
     """Main class for generating the test directory structure."""
@@ -40,12 +44,14 @@ class DirectoryGenerator:
         self.available_themes = available_themes
         self.logger = logger
         self.pdf_generator = PDFGenerator(logger)
+        self.test_log_generator = TestLogGenerator(logger)
+        self.hardware_image_generator = HardwareImageGenerator(logger)
         
         self.ensure_base_dir()
     
     def ensure_base_dir(self):
         """Ensure the base directory exists."""
-        os.makedirs(self.base_dir, exist_ok=True)
+        ensure_directory(self.base_dir, self.logger)
         if self.logger:
             self.logger.info(f"Base directory created at: {self.base_dir}")
     
@@ -55,7 +61,14 @@ class DirectoryGenerator:
         for i in range(self.num_projects):
             if self.logger:
                 self.logger.info(f"Creating project {i+1} of {self.num_projects}")
-            self._create_project()
+            
+            try:
+                self._create_project()
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error creating project {i+1}: {e}")
+                # Continue with next project instead of stopping entirely
+                continue
     
     def _create_project(self):
         """Create a single project folder with all subfolders and files."""
@@ -72,19 +85,25 @@ class DirectoryGenerator:
             self.logger.info(f"Creating project: {project_dir_name}")
             self.logger.info(f"Project theme: {project_theme['name']}")
         
-        os.makedirs(project_path, exist_ok=True)
+        ensure_directory(project_path, self.logger)
         
-        # Create admin and testing folders
+        # Create admin, testing, and receiving folders
         admin_path = os.path.join(project_path, "admin")
         testing_path = os.path.join(project_path, "testing")
-        os.makedirs(admin_path, exist_ok=True)
-        os.makedirs(testing_path, exist_ok=True)
+        receiving_path = os.path.join(project_path, "receiving")
+        
+        ensure_directory(admin_path, self.logger)
+        ensure_directory(testing_path, self.logger)
+        ensure_directory(receiving_path, self.logger)
         
         # Create admin subfolders and files
         self._create_admin_folders(admin_path, project_theme)
         
         # Create testing subfolders and files
         self._create_testing_folders(testing_path, project_theme)
+        
+        # Create receiving folder with hardware images
+        self._create_receiving_folder(receiving_path, project_theme)
     
     def _generate_company_name(self):
         """Generate a random aerospace company name."""
@@ -106,21 +125,21 @@ class DirectoryGenerator:
         """Create the admin folders and their contents."""
         # Create PO folder and possibly a PO file
         po_path = os.path.join(admin_path, "PO")
-        os.makedirs(po_path, exist_ok=True)
+        ensure_directory(po_path, self.logger)
         if random.random() < 0.8:  # 80% chance to create a PO file
             po_number = ''.join(random.choices(string.digits, k=6))
             self.pdf_generator.create_purchase_order(po_path, f"PO{po_number}", project_theme)
         
         # Create quotes folder and possibly a quote file
         quotes_path = os.path.join(admin_path, "quotes")
-        os.makedirs(quotes_path, exist_ok=True)
+        ensure_directory(quotes_path, self.logger)
         if random.random() < 0.8:  # 80% chance to create a quote file
             quote_number = ''.join(random.choices(string.digits, k=6))
             self.pdf_generator.create_quote(quotes_path, f"Quote{quote_number}", project_theme)
         
         # Create specification folder and possibly a spec file
         spec_path = os.path.join(admin_path, "specification")
-        os.makedirs(spec_path, exist_ok=True)
+        ensure_directory(spec_path, self.logger)
         if random.random() < 0.8:  # 80% chance to create a spec file
             spec_number = ''.join(random.choices(string.digits, k=6))
             self.pdf_generator.create_specification(spec_path, f"spec{spec_number}", project_theme)
@@ -130,55 +149,102 @@ class DirectoryGenerator:
         # Create test type folders (Dynamics, EMIEMC, Environmental)
         for test_type in TEST_TYPES.keys():
             test_type_path = os.path.join(testing_path, test_type)
-            os.makedirs(test_type_path, exist_ok=True)
+            ensure_directory(test_type_path, self.logger)
             
             # Create 1-5 PHB folders within each test type folder
             for _ in range(random.randint(1, 5)):
                 phb_id = 'PHB' + ''.join(random.choices(string.digits, k=8))
                 phb_path = os.path.join(test_type_path, phb_id)
-                os.makedirs(phb_path, exist_ok=True)
+                ensure_directory(phb_path, self.logger)
                 
                 # Create standard subfolders within each PHB folder
-                self._create_phb_subfolders(phb_path, test_type, project_theme)
+                try:
+                    self._create_phb_subfolders(phb_path, test_type, project_theme)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.error(f"Error creating PHB subfolders for {phb_id}: {e}")
+                    continue
     
     def _create_phb_subfolders(self, phb_path, test_type, project_theme):
         """Create the standard subfolders within a PHB folder."""
         # Create data folder with data files
         data_path = os.path.join(phb_path, "data")
-        os.makedirs(data_path, exist_ok=True)
+        ensure_directory(data_path, self.logger)
         
         # Create 0-20 data files
         num_data_files = random.randint(0, 20)
         for i in range(num_data_files):
             file_num = f"{i+1:03d}"
             description = self._generate_data_description(test_type, project_theme)
-            self._create_data_graph(data_path, f"{file_num}_{description}.jpg", description, test_type)
+            try:
+                self._create_data_graph(data_path, f"{file_num}_{description}.jpg", description, test_type)
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error creating data graph {file_num}_{description}.jpg: {e}")
+                continue
         
         # Create NODs folder possibly with NOD files
         nods_path = os.path.join(phb_path, "NODs")
-        os.makedirs(nods_path, exist_ok=True)
+        ensure_directory(nods_path, self.logger)
         
         # 20% chance to create 1-5 NOD files
         if random.random() < 0.2:
             num_nod_files = random.randint(1, 5)
             for _ in range(num_nod_files):
-                date = self._generate_random_date()
-                self.pdf_generator.create_nod(nods_path, f"NOD_{date.strftime('%m.%d.%Y')}", project_theme)
+                try:
+                    date = self._generate_random_date()
+                    self.pdf_generator.create_nod(nods_path, f"NOD_{date.strftime('%m.%d.%Y')}", project_theme)
+                except Exception as e:
+                    if self.logger:
+                        self.logger.error(f"Error creating NOD file: {e}")
+                    continue
         
         # Create photographs folder with photos
         photos_path = os.path.join(phb_path, "photographs")
-        os.makedirs(photos_path, exist_ok=True)
+        ensure_directory(photos_path, self.logger)
         
         # Create 1-25 photograph files
         num_photos = random.randint(1, 25)
         for i in range(num_photos):
-            component = random.choice(project_theme["components"])
-            orientation = "landscape" if random.random() < 0.5 else "portrait"
-            self._create_dummy_photo(photos_path, f"photo_{i+1:03d}_{component}.jpeg", component, orientation)
+            try:
+                component = sanitize_filename(random.choice(project_theme["components"]))
+                orientation = "landscape" if random.random() < 0.5 else "portrait"
+                self.hardware_image_generator.generate_hardware_image(
+                    photos_path, f"photo_{i+1:03d}_{component}", orientation
+                )
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error creating photograph: {e}")
+                continue
         
-        # Create worksheets folder
+        # Create worksheets folder with test logs
         worksheets_path = os.path.join(phb_path, "worksheets")
-        os.makedirs(worksheets_path, exist_ok=True)
+        ensure_directory(worksheets_path, self.logger)
+        
+        # Create 1-2 test log PDFs
+        num_logs = random.randint(1, 2)
+        for _ in range(num_logs):
+            try:
+                self.test_log_generator.create_test_log(worksheets_path, test_type, project_theme)
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error creating test log: {e}")
+                continue
+    
+    def _create_receiving_folder(self, receiving_path, project_theme):
+        """Create the receiving folder with hardware images."""
+        # Create 0-5 hardware images of components
+        if random.random() < 0.8:  # 80% chance to create hardware images
+            num_images = random.randint(1, 5)
+            try:
+                self.hardware_image_generator.generate_multiple_images(
+                    receiving_path, project_theme["components"], count=num_images
+                )
+                if self.logger:
+                    self.logger.info(f"Created {num_images} hardware images in receiving folder")
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Error creating hardware images: {e}")
     
     def _generate_data_description(self, test_type, project_theme):
         """Generate a relevant data description based on test type and project theme."""
@@ -189,9 +255,9 @@ class DirectoryGenerator:
         data_type = random.choice(project_theme["data_descriptions"])
         
         # Sanitize component, data_type, and test_specific to replace slashes with hyphens
-        component = component.replace('/', '-').replace('\\', '-')
-        data_type = data_type.replace('/', '-').replace('\\', '-')
-        test_specific = test_specific.replace('/', '-').replace('\\', '-')
+        component = sanitize_filename(component)
+        data_type = sanitize_filename(data_type)
+        test_specific = sanitize_filename(test_specific)
         
         return f"{component}_{data_type}_{test_specific}"
     
@@ -201,10 +267,14 @@ class DirectoryGenerator:
         days_back = random.randint(1, 3 * 365)  # Up to 3 years back
         return today - datetime.timedelta(days=days_back)
     
+    @safe_file_operation
     def _create_data_graph(self, path, filename, description, test_type):
         """Create a dummy data graph as a JPG file."""
         if self.logger:
             self.logger.debug(f"Creating data graph: {filename}")
+        
+        # Ensure path exists
+        ensure_directory(path, self.logger)
         
         # Create a simple matplotlib graph
         plt.figure(figsize=(10, 6))
@@ -234,47 +304,9 @@ class DirectoryGenerator:
         plt.xlabel("Time (s)")
         plt.grid(True)
         
+        # Ensure the filename is safe
+        safe_filename = sanitize_filename(filename)
+        
         # Save the figure to the specified path
-        plt.savefig(os.path.join(path, filename), dpi=100)
+        plt.savefig(os.path.join(path, safe_filename), dpi=100)
         plt.close()
-    
-    def _create_dummy_photo(self, path, filename, component, orientation):
-        """Create a dummy photo (simple image with component name)."""
-        if self.logger:
-            self.logger.debug(f"Creating dummy photo: {filename}")
-        
-        # Sanitize the component name for safe file paths
-        component = component.replace('/', '-').replace('\\', '-')
-        
-        # Set dimensions based on orientation
-        if orientation == "landscape":
-            width, height = 800, 600
-        else:
-            width, height = 600, 800
-        
-        # Create a new image with a light gray background
-        image = Image.new('RGB', (width, height), color=(240, 240, 240))
-        draw = ImageDraw.Draw(image)
-        
-        # Draw a simple representation of the component
-        draw.rectangle(
-            [(width * 0.2, height * 0.2), (width * 0.8, height * 0.8)],
-            outline=(0, 0, 0),
-            fill=(220, 220, 220)
-        )
-        
-        # Add some simple shapes within the component to make it look like test equipment
-        draw.line([(width * 0.3, height * 0.3), (width * 0.7, height * 0.3)], fill=(0, 0, 0), width=2)
-        draw.line([(width * 0.3, height * 0.4), (width * 0.7, height * 0.4)], fill=(0, 0, 0), width=2)
-        draw.rectangle(
-            [(width * 0.4, height * 0.5), (width * 0.6, height * 0.7)],
-            outline=(0, 0, 0),
-            fill=(200, 200, 200)
-        )
-        
-        # Add the component name as text
-        draw.text((width * 0.1, height * 0.1), f"Test Setup: {component}", fill=(0, 0, 0))
-        draw.text((width * 0.1, height * 0.85), f"Orientation: {orientation}", fill=(0, 0, 0))
-        
-        # Save the image
-        image.save(os.path.join(path, filename))

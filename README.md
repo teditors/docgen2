@@ -4,12 +4,17 @@ This tool generates a realistic directory structure for aerospace hardware testi
 
 ## Features
 
-- Creates a structured folder hierarchy for multiple aerospace testing projects
+- Creates a comprehensive folder hierarchy for multiple aerospace testing projects
 - Generates realistic project names with aerospace company naming conventions
 - Builds consistent themes throughout each project (e.g., rocket engines, satellites, landing gear)
-- Creates business documents like purchase orders, quotes, and specifications as PDFs
-- Generates simulated test data graphs that are relevant to the test types
-- Creates dummy photographs with correct orientations
+- Creates detailed business documents as PDFs:
+  - Purchase orders with technical requirements and procurement details
+  - Quotes with pricing breakdowns and delivery schedules
+  - Technical specifications with comprehensive requirements
+  - Notices of Deviation (NODs) with technical justifications
+- Produces test logs with realistic test procedures and measurements
+- Generates realistic hardware photographs specific to each component type
+- Creates simulated test data graphs that are relevant to the test types
 - Maintains comprehensive logging for all operations
 
 ## Directory Structure
@@ -26,18 +31,21 @@ testbed/
 │   │   │   └── Quote###### (PDF file)
 │   │   └── specification/
 │   │       └── spec###### (PDF file)
-│   └── testing/
-│       ├── Dynamics/
-│       │   └── PHB########/
-│       │       ├── data/
-│       │       │   └── ###_Description.jpg (data graphs)
-│       │       ├── NODs/
-│       │       │   └── NOD_mm.dd.yyyy.pdf (deviation notices)
-│       │       ├── photographs/
-│       │       │   └── photo_###_Component.jpeg (test photos)
-│       │       └── worksheets/
-│       ├── EMIEMC/
-│       └── Environmental/
+│   ├── testing/
+│   │   ├── Dynamics/
+│   │   │   └── PHB########/
+│   │   │       ├── data/
+│   │   │       │   └── ###_Description.jpg (data graphs)
+│   │   │       ├── NODs/
+│   │   │       │   └── NOD_mm.dd.yyyy.pdf (deviation notices)
+│   │   │       ├── photographs/
+│   │   │       │   └── photo_###_Component.jpeg (test photos)
+│   │   │       └── worksheets/
+│   │   │           └── TestLog_Component_TestProc_YYYYMMDD.pdf (test logs)
+│   │   ├── EMIEMC/
+│   │   └── Environmental/
+│   └── receiving/
+│       └── hardware_Component_####.jpeg (component photos)
 ├── PD######## Company Name 2/
 ...
 ```
@@ -123,6 +131,23 @@ The generator includes the following aerospace test themes:
 
 Each theme has its own set of components, test procedures, and data types to ensure consistency within projects.
 
+## Modules Overview
+
+The project consists of several modules:
+
+- **main.py**: Main entry point with command-line argument parsing
+- **config.py**: Configuration settings for the generator
+- **logger.py**: Logging setup and configuration
+- **directory_generator.py**: Main directory structure creation
+- **pdf_generator.py**: PDF document generation for POs, quotes, specs, etc.
+- **test_log_generator.py**: Generation of test log PDFs
+- **hardware_image_generator.py**: Interface for hardware image generation
+- **hardware_generator_main.py**: Main implementation of hardware image generation
+- **component_drawers_1.py** & **component_drawers_2.py**: Component-specific drawing functions
+- **hardware_image_config.py**: Configuration for hardware images
+- **drawer_utils.py**: Utilities for drawing operations
+- **utility_functions.py**:Utility functions for the test directory generator
+
 ## Extending the Generator
 
 The modular design makes it easy to extend the generator:
@@ -131,6 +156,16 @@ The modular design makes it easy to extend the generator:
 - Create new document types in `pdf_generator.py`
 - Add different test types in `config.py`
 - Implement new file generators in `directory_generator.py`
+- Add new hardware component types in `hardware_image_config.py`
+- Create drawing functions for new components in component drawer modules
+
+## Error Handling
+
+The generator includes comprehensive error handling:
+- Path sanitization to handle special characters
+- Try/except blocks to prevent crashes from individual file operations
+- Detailed logging of all operations and errors
+- Safe file operation decorators
 
 ## License
 
