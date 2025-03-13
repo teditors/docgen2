@@ -20,8 +20,7 @@ from config import (
     COMPANY_NAME_SUFFIXES,
     TEST_TYPES
 )
-from pdf_generator import PDFGenerator
-from test_log_generator import TestLogGenerator
+from document_factory import DocumentFactory
 from hardware_generator_main import HardwareImageGenerator
 from logger import setup_logger
 from utility_functions import sanitize_filename, ensure_directory, safe_file_operation
@@ -29,7 +28,7 @@ from utility_functions import sanitize_filename, ensure_directory, safe_file_ope
 class DirectoryGenerator:
     """Main class for generating the test directory structure."""
     
-    def __init__(self, base_dir, num_projects=10, available_themes=None, logger=None):
+    def __init__(self, base_dir, num_projects=10, available_themes=None, logger=None, output_format="pdf"):
         """
         Initialize the generator.
         
@@ -38,13 +37,16 @@ class DirectoryGenerator:
             num_projects (int, optional): Number of projects to create. Defaults to 10.
             available_themes (list, optional): List of themes to use. Defaults to None (all themes).
             logger (logging.Logger, optional): Logger to use. Defaults to None.
+            output_format (str, optional): Format for document files ("pdf", "jpg", or "png"). Defaults to "pdf".
         """
         self.base_dir = base_dir
         self.num_projects = num_projects
         self.available_themes = available_themes
         self.logger = logger
-        self.pdf_generator = PDFGenerator(logger)
-        self.test_log_generator = TestLogGenerator(logger)
+        self.output_format = output_format.lower()
+        
+        # Initialize the appropriate document renderer based on output format
+        self.doc_renderer = DocumentFactory.create_renderer(self.output_format, logger)
         self.hardware_image_generator = HardwareImageGenerator(logger)
         
         self.ensure_base_dir()
@@ -126,23 +128,20 @@ class DirectoryGenerator:
         # Create PO folder and possibly a PO file
         po_path = os.path.join(admin_path, "PO")
         ensure_directory(po_path, self.logger)
-        if random.random() < 0.8:  # 80% chance to create a PO file
-            po_number = ''.join(random.choices(string.digits, k=6))
-            self.pdf_generator.create_purchase_order(po_path, f"PO{po_number}", project_theme)
+        po_number = ''.join(random.choices(string.digits, k=6))
+        self.doc_renderer.create_purchase_order(po_path, f"PO{po_number}", project_theme)
         
         # Create quotes folder and possibly a quote file
         quotes_path = os.path.join(admin_path, "quotes")
         ensure_directory(quotes_path, self.logger)
-        if random.random() < 0.8:  # 80% chance to create a quote file
-            quote_number = ''.join(random.choices(string.digits, k=6))
-            self.pdf_generator.create_quote(quotes_path, f"Quote{quote_number}", project_theme)
+        quote_number = ''.join(random.choices(string.digits, k=6))
+        self.doc_renderer.create_quote(quotes_path, f"Quote{quote_number}", project_theme)
         
         # Create specification folder and possibly a spec file
         spec_path = os.path.join(admin_path, "specification")
         ensure_directory(spec_path, self.logger)
-        if random.random() < 0.8:  # 80% chance to create a spec file
-            spec_number = ''.join(random.choices(string.digits, k=6))
-            self.pdf_generator.create_specification(spec_path, f"spec{spec_number}", project_theme)
+        spec_number = ''.join(random.choices(string.digits, k=6))
+        self.doc_renderer.create_specification(spec_path, f"spec{spec_number}", project_theme)
     
     def _create_testing_folders(self, testing_path, project_theme):
         """Create the testing folders and their contents."""
@@ -151,8 +150,8 @@ class DirectoryGenerator:
             test_type_path = os.path.join(testing_path, test_type)
             ensure_directory(test_type_path, self.logger)
             
-            # Create 1-5 PHB folders within each test type folder
-            for _ in range(random.randint(1, 5)):
+            # Create 0-5 PHB folders within each test type folder
+            for _ in range(random.randint(0, 5)):
                 phb_id = 'PHB' + ''.join(random.choices(string.digits, k=8))
                 phb_path = os.path.join(test_type_path, phb_id)
                 ensure_directory(phb_path, self.logger)
@@ -171,8 +170,8 @@ class DirectoryGenerator:
         data_path = os.path.join(phb_path, "data")
         ensure_directory(data_path, self.logger)
         
-        # Create 0-20 data files
-        num_data_files = random.randint(0, 20)
+        # Create 0-10 data files
+        num_data_files = random.randint(0, 10)
         for i in range(num_data_files):
             file_num = f"{i+1:03d}"
             description = self._generate_data_description(test_type, project_theme)
@@ -187,13 +186,14 @@ class DirectoryGenerator:
         nods_path = os.path.join(phb_path, "NODs")
         ensure_directory(nods_path, self.logger)
         
-        # 20% chance to create 1-5 NOD files
+        # 20% chance to create 1-3 NOD files
         if random.random() < 0.2:
-            num_nod_files = random.randint(1, 5)
+            num_nod_files = random.randint(1, 3)
             for _ in range(num_nod_files):
                 try:
                     date = self._generate_random_date()
-                    self.pdf_generator.create_nod(nods_path, f"NOD_{date.strftime('%m.%d.%Y')}", project_theme)
+                    # Use the document renderer to create NOD files
+                    self.doc_renderer.create_nod(nods_path, f"NOD_{date.strftime('%m.%d.%Y')}", project_theme)
                 except Exception as e:
                     if self.logger:
                         self.logger.error(f"Error creating NOD file: {e}")
@@ -203,8 +203,8 @@ class DirectoryGenerator:
         photos_path = os.path.join(phb_path, "photographs")
         ensure_directory(photos_path, self.logger)
         
-        # Create 1-25 photograph files
-        num_photos = random.randint(1, 25)
+        # Create 1-10 photograph files
+        num_photos = random.randint(1, 10)
         for i in range(num_photos):
             try:
                 component = sanitize_filename(random.choice(project_theme["components"]))
@@ -221,11 +221,11 @@ class DirectoryGenerator:
         worksheets_path = os.path.join(phb_path, "worksheets")
         ensure_directory(worksheets_path, self.logger)
         
-        # Create 1-2 test log PDFs
+        # Create 1-2 test log documents
         num_logs = random.randint(1, 2)
         for _ in range(num_logs):
             try:
-                self.test_log_generator.create_test_log(worksheets_path, test_type, project_theme)
+                self.doc_renderer.create_test_log(worksheets_path, test_type, project_theme)
             except Exception as e:
                 if self.logger:
                     self.logger.error(f"Error creating test log: {e}")
@@ -233,18 +233,17 @@ class DirectoryGenerator:
     
     def _create_receiving_folder(self, receiving_path, project_theme):
         """Create the receiving folder with hardware images."""
-        # Create 0-5 hardware images of components
-        if random.random() < 0.8:  # 80% chance to create hardware images
-            num_images = random.randint(1, 5)
-            try:
-                self.hardware_image_generator.generate_multiple_images(
-                    receiving_path, project_theme["components"], count=num_images
-                )
-                if self.logger:
-                    self.logger.info(f"Created {num_images} hardware images in receiving folder")
-            except Exception as e:
-                if self.logger:
-                    self.logger.error(f"Error creating hardware images: {e}")
+        # Create 1-5 hardware images of components
+        num_images = random.randint(1, 5)
+        try:
+            self.hardware_image_generator.generate_multiple_images(
+                receiving_path, project_theme["components"], count=num_images
+            )
+            if self.logger:
+                self.logger.info(f"Created {num_images} hardware images in receiving folder")
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"Error creating hardware images: {e}")
     
     def _generate_data_description(self, test_type, project_theme):
         """Generate a relevant data description based on test type and project theme."""

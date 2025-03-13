@@ -23,14 +23,12 @@ from hardware_image_config import (
 from utility_functions import sanitize_filename, ensure_directory, safe_file_operation
 
 # Import drawing functions
-from component_drawers_1 import (
+from component_drawers import (
     draw_rocket_engine,
     draw_solar_panel,
     draw_landing_gear,
     draw_avionics,
-    draw_fuel_tank
-)
-from component_drawers_2 import (
+    draw_fuel_tank,
     draw_heat_shield,
     draw_control_surface,
     draw_propellant_valve,

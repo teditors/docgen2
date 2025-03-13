@@ -34,8 +34,8 @@ def parse_arguments():
     parser.add_argument(
         '--projects', 
         type=int, 
-        default=10,
-        help='Number of project folders to create. Default is 10.'
+        default=5,
+        help='Number of project folders to create. Default is 5.'
     )
     
     parser.add_argument(
@@ -68,6 +68,14 @@ def parse_arguments():
         '--themes',
         type=str,
         help='Comma-separated list of theme indices to use (0-9). Default is all themes.'
+    )
+        
+    parser.add_argument(
+        '--output-format',
+        type=str,
+        default='pdf',
+        choices=['pdf', 'jpg', 'png'],
+        help='Format for document files. Use "jpg" or "png" on platforms without PDF support (like Android). Default is "pdf".'
     )
     
     return parser.parse_args()
@@ -110,7 +118,8 @@ def main():
         base_dir=args.output_dir,
         num_projects=args.projects,
         available_themes=available_themes,
-        logger=logger
+        logger=logger,
+        output_format=args.output_format 
     )
     
     generator.generate_structure()

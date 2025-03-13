@@ -4,8 +4,13 @@ matplotlib>=3.4.0
 Pillow>=8.2.0
 reportlab>=3.6.0
 
-# PDF generation dependencies
+# PDF generation dependencies (optional on Android)
 PyPDF2>=2.0.0
 
 # Path handling
 pathlib>=1.0.1
+
+# For text rendering in images
+# Note: These are commonly installed with Pillow, but we list them explicitly
+python-bidi>=0.4.2  # For bidirectional text support
+freetype-py>=2.2.0  # For better font rendering

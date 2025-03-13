@@ -88,7 +88,9 @@ optional arguments:
   -h, --help            show this help message and exit
   --output-dir OUTPUT_DIR
                         Output directory for the test structure. Defaults to "testbed" in the current directory.
-  --projects PROJECTS   Number of project folders to create. Default is 10.
+  --output-format OUTPUT_FORMAT
+                        Output format for document artifacts.  Default is 'pdf'
+  --projects PROJECTS   Number of project folders to create. Default is 5.
   --seed SEED           Random seed for reproducible generation.
   --log-file LOG_FILE   Path to the log file. Defaults to "generator_TIMESTAMP.log" in the script directory.
   --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
@@ -112,6 +114,11 @@ python main.py --themes 0,3
 Change the output directory:
 ```bash
 python main.py --output-dir ~/aerospace_data
+```
+
+Change the output format for document artifacts:
+```bash
+python main.py --output-format png
 ```
 
 ## Project Themes
